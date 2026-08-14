@@ -449,6 +449,13 @@ img{display:block;max-width:100%;}
 
 /* 成长树积分进度 */
 .leaf-row{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-s);margin-bottom:8px;}
+
+/* GitHub 同步卡片 */
+.gh .fld input{width:100%;box-sizing:border-box;}
+.gh .src.warn{color:var(--berry);font-weight:600;line-height:1.55;}
+.gh .src.err{color:var(--berry);font-weight:600;line-height:1.55;min-height:14px;}
+.gh #ghStatus:empty{display:none;}
+.gh .btn.primary .ic{width:17px;height:17px;vertical-align:-3px;margin-right:3px;}
 .leaf-row b{color:var(--leaf-d);}
 .leaf-bar{height:9px;border-radius:6px;background:var(--cream);overflow:hidden;}
 .leaf-bar i{display:block;height:100%;background:var(--leaf);border-radius:6px;transition:.3s;}

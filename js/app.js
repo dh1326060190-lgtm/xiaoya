@@ -760,6 +760,18 @@
         <p class="src">数据保存在本机浏览器（localStorage），不会上传。换设备/清缓存前请先「导出全部数据」备份；导出的 JSON 也可放进本地 git 仓库（双击 git-sync.bat）长期保存。</p>
       </div>
 
+      <div class="card gh">
+        <div class="card-h"><b>GitHub 同步</b><span class="sec-more link" data-act="ghClear">清除凭据</span></div>
+        <p class="src warn">⚠️ 此功能会把 Personal Access Token 保存在本机浏览器。仅在私人设备上使用，公用设备请勿填写；用完可在 GitHub 撤销该令牌。</p>
+        <div class="fld"><span>仓库地址</span><input class="inp" data-act="ghRepo" placeholder="https://github.com/owner/repo.git" value="${esc(ghConfig().repo || '')}"></div>
+        <div class="fld"><span>访问令牌 PAT</span><input class="inp" type="password" data-act="ghToken" placeholder="ghp_..." value="${esc(ghConfig().token || '')}"></div>
+        <div class="row2">
+          <button class="btn ghost" data-act="ghSave">保存配置</button>
+          <button class="btn primary" data-act="ghPush">${ic('github')} 推送到 GitHub</button>
+        </div>
+        <p class="src err" id="ghStatus"></p>
+      </div>
+
       <div class="card about">
         <div class="brand-center">${XY.logo(40)}<b>小芽</b></div>
         <p>把孩子的每一次长大，温柔记下来。</p>
@@ -1171,6 +1183,9 @@
       }
       case 'reset': confirmReset(); break;
       case 'report': navigate('report'); break;
+      case 'ghSave': { const r = document.querySelector('[data-act="ghRepo"]'), tk = document.querySelector('[data-act="ghToken"]'); localStorage.setItem('xiaoya_gh', JSON.stringify({ repo: (r ? r.value : '').trim(), token: (tk ? tk.value : '').trim() })); toast('GitHub 配置已保存'); break; }
+      case 'ghClear': { localStorage.removeItem('xiaoya_gh'); toast('已清除 GitHub 凭据'); render(); break; }
+      case 'ghPush': { const r = document.querySelector('[data-act="ghRepo"]'), tk = document.querySelector('[data-act="ghToken"]'); let repo = (r ? r.value : '').trim(), token = (tk ? tk.value : '').trim(); if (!repo || !token) { const c = ghConfig(); repo = repo || c.repo || ''; token = token || c.token || ''; } pushToGitHub(repo, token); break; }
       case 'rewards': navigate('rewards'); break;
       case 'redeem': redeemReward(t.dataset.id); break;
       case 'health': openHealth(); break;
@@ -1410,6 +1425,46 @@
       toast('导入失败：' + (e && e.message ? e.message : e));
     }
   }
+  function ghConfig() { try { return JSON.parse(localStorage.getItem('xiaoya_gh') || '{}') || {}; } catch (e) { return {}; } }
+  function b64utf8(str) { return btoa(unescape(encodeURIComponent(str))); }
+  function ghSetStatus(msg) { const el = document.getElementById('ghStatus'); if (el) { el.textContent = msg || ''; } }
+  async function pushToGitHub(repo, token) {
+    if (!repo || !token) { ghSetStatus('请先填写仓库地址和访问令牌（或先「保存配置」）'); toast('缺少仓库地址或令牌', 'warn'); return; }
+    let m = repo.trim().replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '').replace(/^git@github\.com:/, '');
+    const mm = m.match(/^([^\/\s]+)\/([^\/\s]+)$/);
+    if (!mm) { ghSetStatus('仓库地址格式不对，应为 https://github.com/owner/repo.git'); return; }
+    const owner = mm[1], name = mm[2];
+    ghSetStatus('正在连接 GitHub…');
+    const api = 'https://api.github.com';
+    const head = { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' };
+    let branch = 'master';
+    try {
+      const ri = await fetch(api + '/repos/' + owner + '/' + name, { headers: head });
+      if (ri.status === 401) { ghSetStatus('令牌无效或无权限（401），请检查 PAT 与 repo 权限'); return; }
+      if (!ri.ok) { ghSetStatus('仓库读取失败（' + ri.status + '），确认仓库地址与可见性'); return; }
+      const rj = await ri.json(); branch = (rj.default_branch) || 'master';
+    } catch (err) { ghSetStatus('网络错误：' + (err && err.message ? err.message : err)); return; }
+    const files = ['index.html', 'css/styles.css', 'js/app.js', 'js/data.js', 'js/sprite.js'];
+    for (let i = 0; i < files.length; i++) {
+      const path = files[i];
+      ghSetStatus('推送中（' + (i + 1) + '/' + files.length + '）：' + path);
+      let content;
+      try { const r = await fetch('./' + path, { cache: 'no-store' }); if (!r.ok) { ghSetStatus('读取本地文件失败：' + path + '（' + r.status + '）'); return; } content = await r.text(); }
+      catch (err) { ghSetStatus('读取本地文件失败：' + path); return; }
+      let sha = null;
+      try { const g = await fetch(api + '/repos/' + owner + '/' + name + '/contents/' + encodeURIComponent(path) + '?ref=' + branch, { headers: head }); if (g.status === 200) { const gj = await g.json(); sha = gj.sha; } }
+      catch (e) {}
+      const body = { message: 'sync: 部署同步 ' + new Date().toISOString().slice(0, 16).replace('T', ' '), content: b64utf8(content), branch: branch };
+      if (sha) body.sha = sha;
+      try {
+        const pu = await fetch(api + '/repos/' + owner + '/' + name + '/contents/' + encodeURIComponent(path), { method: 'PUT', headers: head, body: JSON.stringify(body) });
+        if (!pu.ok) { let em = ''; try { em = (await pu.json()).message || ''; } catch (e) {} ghSetStatus('推送失败 ' + path + '：' + pu.status + ' ' + em); return; }
+      } catch (err) { ghSetStatus('推送异常 ' + path + '：' + (err && err.message ? err.message : err)); return; }
+    }
+    ghSetStatus('✅ 已成功推送到 GitHub（' + branch + ' 分支，' + files.length + ' 个文件）');
+    toast('已推送到 GitHub');
+  }
+
   function confirmReset() {
     openModal(`<div class="confirm">
       <b>恢复示例数据？</b>
