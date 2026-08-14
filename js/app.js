@@ -753,9 +753,11 @@
       <div class="card">
         <div class="card-h"><b>数据</b></div>
         <button class="line-btn" data-act="export">${ic('download')} 导出全部数据（JSON）</button>
+        <button class="line-btn" data-act="import">${ic('upload')} 从备份文件恢复数据（JSON）</button>
         <button class="line-btn" data-act="report">${ic('trophy')} 查看阶段报告</button>
         <button class="line-btn danger" data-act="reset">${ic('refresh')} 恢复示例数据</button>
-        <p class="src">所有数据保存在本机浏览器（localStorage），不会上传。换设备或清缓存会丢失，记得常导出备份。</p>
+        <input type="file" id="importFile" accept="application/json,.json" style="display:none">
+        <p class="src">数据保存在本机浏览器（localStorage），不会上传。换设备/清缓存前请先「导出全部数据」备份；导出的 JSON 也可放进本地 git 仓库（双击 git-sync.bat）长期保存。</p>
       </div>
 
       <div class="card about">
@@ -1152,6 +1154,21 @@
       case 'addcat': addCategory(); break;
       case 'delcat': delCategory(t.dataset.cat); break;
       case 'export': exportData(); break;
+      case 'import': {
+        const inp = document.getElementById('importFile');
+        if (inp) {
+          inp.value = '';
+          inp.onchange = () => {
+            const f = inp.files && inp.files[0];
+            if (!f) return;
+            const rd = new FileReader();
+            rd.onload = () => importData(rd.result);
+            rd.readAsText(f);
+          };
+          inp.click();
+        }
+        break;
+      }
       case 'reset': confirmReset(); break;
       case 'report': navigate('report'); break;
       case 'rewards': navigate('rewards'); break;
@@ -1372,6 +1389,26 @@
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'xiaoya-backup-' + todayStr() + '.json'; a.click();
     toast('已导出备份文件');
+  }
+  function importData(text) {
+    try {
+      const d = JSON.parse(text);
+      if (!d || typeof d !== 'object' || !Array.isArray(d.records)) throw new Error('文件格式不正确');
+      state = d;
+      if (typeof state.points !== 'number') state.points = 0;
+      if (!Array.isArray(state.pointLog)) state.pointLog = [];
+      if (typeof state.treeLeaves !== 'number') state.treeLeaves = 0;
+      if (!Array.isArray(state.achievements)) state.achievements = [];
+      if (!Array.isArray(state.health)) state.health = [];
+      if (!Array.isArray(state.categories)) state.categories = [];
+      if (!state.settings) state.settings = {};
+      save();
+      closeModal();
+      navigate('home');
+      toast('已从备份恢复数据');
+    } catch (e) {
+      toast('导入失败：' + (e && e.message ? e.message : e));
+    }
   }
   function confirmReset() {
     openModal(`<div class="confirm">
