@@ -53,7 +53,7 @@
   }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
 
-  const ui = { view: 'home', params: {}, wizard: null, filters: { q: '', module: '', status: '', tag: '', sort: 'date' }, calMonth: '2026-08', scope: { type: 'all', from: '', to: '' }, homeScope: 'week', albumCollapsed: {}, healthForm: { open: false, htype: 'temp' }, prev: 'home', modal: null, lightbox: null };
+  const ui = { view: 'home', params: {}, wizard: null, filters: { q: '', module: '', status: '', tag: '', sort: 'date' }, calMonth: todayStr().slice(0,7), scope: { type: 'all', from: '', to: '' }, homeScope: 'week', albumCollapsed: {}, healthForm: { open: false, htype: 'temp' }, prev: 'home', modal: null, lightbox: null };
 
   // ---------- 工具 ----------
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -682,7 +682,7 @@
     const famMonth = state.records.filter(r => r.module === 'family' && r.status === 'done' && r.date >= todayStr().slice(0, 7) + '-01').length;
     if (famMonth < 2) out.push('这个月亲子活动还不算多，周末安排一次户外，成长树会更茂盛。');
     const readDoing = state.records.find(r => r.module === 'reading' && r.status === 'doing');
-    if (readDoing) out.push(`今晚继续《${readDoing.fields.book}》睡前共读，把 21 天打卡稳稳接上。`);
+    if (readDoing) out.push(`今晚继续《${readDoing.fields.book || '绘本'}》睡前共读，把 21 天打卡稳稳接上。`);
     const todayR = state.records.find(r => r.reminder && r.reminder.next === todayStr());
     if (todayR) out.push(`今天有提醒：${todayR.reminder.text}`);
     if (!out.length) out.push('最近记录很丰富，保持节奏就好。');
