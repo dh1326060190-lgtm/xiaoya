@@ -1,0 +1,7 @@
+# 本地 GitHub 令牌（含敏感凭证，切勿提交进仓库）
+github-token.txt
+
+# 系统/编辑器临时文件
+Thumbs.db
+.DS_Store
+*.swp
