@@ -92,7 +92,11 @@
 
   // ---------- 路由 ----------
   function navigate(view, params) {
-    ui.prev = ui.view; ui.view = view; ui.params = params || {};
+    ui.prev = ui.view;
+    const seg = String(view).split('/');
+    ui.view = seg[0];
+    ui.params = params || {};
+    if (!params && seg[1]) ui.params = { id: seg[1] };
     if (view !== 'add' && view !== 'edit') ui.wizard = null;
     if (view === 'library') { /* keep filters */ }
     closeModal(); closeLightbox();
@@ -293,8 +297,8 @@
   }
   function scopeReadingCount(scope) {
     const t = todayStr();
-    if (scope === 'month') { const ms = t.slice(0, 7) + '-01'; return state.records.filter(r => r.module === 'reading' && r.date >= ms && r.date <= t).length; }
-    const ws = weekStart(t); return state.records.filter(r => r.module === 'reading' && r.date >= ws && r.date <= t).length;
+    if (scope === 'month') { const ms = t.slice(0, 7) + '-01'; return state.records.filter(r => r.module === 'reading' && r.status === 'done' && r.date >= ms && r.date <= t).length; }
+    const ws = weekStart(t); return state.records.filter(r => r.module === 'reading' && r.status === 'done' && r.date >= ws && r.date <= t).length;
   }
   function homeRecents() {
     const t = todayStr();
@@ -430,6 +434,8 @@
         ${r.note ? `<div class="frow note"><span>备注</span><b>${esc(r.note)}</b></div>` : ''}
       </div>
 
+      ${r.module === 'items' ? itemChecklistHtml(r) : ''}
+
       ${r.module === 'body' ? `<div class="sec"><div class="sec-h"><b>成长曲线</b><span class="sec-sub">WHO 百分位</span></div>${growthChart('height')}${r.fields && r.fields.weight ? growthChart('weight') : ''}</div>` : ''}
 
       ${media.length ? `<div class="sec"><div class="sec-h"><b>媒体</b></div><div class="media-grid">${media.map((m, i) => `<button class="media-th" data-act="media" data-id="${r.id}" data-idx="${i}">${m.type === 'image' ? (m.data ? `<img src="${m.data}" alt="">` : cov(m.cover || r.cover, r.fields && r.fields.book)) : ic('img')}</button>`).join('')}</div></div>` : ''}
@@ -462,6 +468,24 @@
     };
     (map[r.module] || []).forEach(([k, v]) => { if (v) out.push({ k, v: esc(v) }); });
     return out;
+  }
+  function itemChecklistHtml(r) {
+    const f = r.fields || {}; const list = f.list || [];
+    const bought = list.filter(x => x.done).length;
+    const total = (typeof f.total === 'number' && f.total > 0) ? f.total : list.length;
+    return `<div class="sec item-check">
+      <div class="sec-h"><b>采购清单</b><span class="sec-sub">已购 ${bought}/${total}，点一下打勾</span></div>
+      <div class="check-list">${list.length ? list.map((x, i) => `<button class="check-row" data-act="itemCheck" data-id="${r.id}" data-idx="${i}"><span class="ck ${x.done ? 'on' : ''}">${x.done ? '✔' : ''}</span><span class="ck-tx ${x.done ? 'done' : ''}">${esc(x.name)}</span></button>`).join('') : '<p class="src">还没有清单项，去编辑添加吧。</p>'}</div>
+    </div>`;
+  }
+  function toggleItemCheck(id, idx) {
+    const r = byId(id); if (!r || !r.fields || !r.fields.list || !r.fields.list[idx]) return;
+    r.fields.list[idx].done = !r.fields.list[idx].done;
+    r.fields.bought = r.fields.list.filter(x => x.done).length;
+    if (!r.activities) r.activities = [];
+    r.activities.push({ date: todayStr(), text: '更新采购清单：' + (r.fields.list[idx].done ? '已购 ' : '取消 ') + r.fields.list[idx].name });
+    save(); render();
+    toast(r.fields.list[idx].done ? '已标记为已购' : '已取消勾选');
   }
 
   // ---------- 新增向导（三步） ----------
@@ -1135,6 +1159,7 @@
       case 'addMod': ui.wizard = { step: 2, module: t.dataset.module, title: '', date: todayStr(), status: 'doing', tags: [], note: '', fields: {}, media: [], cover: MODULES[t.dataset.module].cover }; navigate('add'); break;
       case 'edit': ui.wizard = null; navigate('edit/' + id); break;
       case 'toggle': toggleStatus(id); break;
+      case 'itemCheck': toggleItemCheck(id, +t.dataset.idx); break;
       case 'del': confirmDelete(id); break;
       case 'ftag': ui.filters.tag = t.dataset.tag; navigate('library'); break;
       case 'cleartag': ui.filters.tag = ''; ui.filters.module = ''; ui.filters.status = ''; ui.filters.q = ''; if (ui.view === 'library') { render(); } else navigate('library'); break;
@@ -1280,6 +1305,7 @@
       if (!wasDone) { awardPoints(r); if (r.module === 'family') growTree(r); else { const g = recalcTree(); if (g > 0) toast('小芽攒够 ' + LEAF_PER_POINTS + ' 分，成长树又长出 ' + g + ' 片叶 🌿'); } }
     } else {
       r.activities.push({ date: now, text: '状态改为：' + sName(r.status) });
+      if (wasDone) { const g = recalcTree(); if (g < 0) toast('成长树掉落了 ' + (-g) + ' 片叶'); }
     }
     save(); navigate('detail/' + id);
     if (r.status === 'done') toast(r.module === 'family' ? '完成啦！成长树长出新叶 🌿' : '已完成，进度已更新');
@@ -1288,13 +1314,11 @@
   function familyDoneCount() { return state.records.filter(r => r.module === 'family' && r.status === 'done').length; }
   function recalcTree() {
     const target = familyDoneCount() + Math.floor((state.points || 0) / LEAF_PER_POINTS);
-    if (target > state.treeLeaves) {
-      const grown = target - state.treeLeaves;
-      state.treeLeaves = Math.min(30, target);
-      save();
-      return grown;
-    }
-    return 0;
+    const newLeaves = Math.max(0, Math.min(30, target));
+    const diff = newLeaves - state.treeLeaves;
+    state.treeLeaves = newLeaves;
+    save();
+    return diff; // >0 长出，<0 掉落，0 不变
   }
   function growTree(r) {
     const before = state.treeLeaves;
@@ -1328,6 +1352,7 @@
     state.records.splice(i, 1);
     // 清理关联引用
     state.records.forEach(r => { if (r.related) r.related = r.related.filter(x => x !== id); });
+    recalcTree();
     save(); closeModal();
     toast('已删除，记录总数已更新');
     navigate(ui.prev === 'detail' ? 'library' : (ui.prev || 'library'));
@@ -1346,7 +1371,7 @@
     } else {
       const r = { id: uid(), module: w.module, title: w.title.trim(), date: w.date, status: w.status, tags: [...w.tags], note: w.note, cover: w.cover || MODULES[w.module].cover, fields, media: w.media, related: [], activities: [{ date: todayStr(), text: '新建记录' }], reminder: w.reminder || null };
       state.records.unshift(r);
-      if (r.status === 'done') awardPoints(r);
+      if (r.status === 'done') { awardPoints(r); if (r.module === 'family') growTree(r); else { const g = recalcTree(); if (g > 0) toast('小芽攒够 ' + LEAF_PER_POINTS + ' 分，成长树又长出 ' + g + ' 片叶 🌿'); } }
       toast('已添加，成长册总数 +1');
     }
     save(); ui.wizard = null;

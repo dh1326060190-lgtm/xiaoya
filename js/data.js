@@ -38,8 +38,8 @@
       text: '苗苗已经连续 21 天和妈妈一起读绘本啦，这个习惯正在悄悄长成小树。', module: 'reading' }
   ];
 
-  // 成长树初始叶子数（完成 1 次亲子活动 +1）
-  const TREE_LEAVES = 3;
+  // 成长树初始叶子数：与公式一致 = 亲子活动已完成数(1) + floor(积分(26)/20) = 2
+  const TREE_LEAVES = 2;
 
   // 健康日程（4–6 岁疫苗 / 体检 / 流感节点，苗苗生于 2022-05-12，现 4 岁 3 个月）
   const HEALTH_SCHEDULE = [
@@ -151,11 +151,11 @@
       media: [{ type: 'image', cover: 'sticker', caption: '今日习惯贴纸' }], related: ['r02'], activities: [{ date: '2026-08-14', text: '今日作息进行中' }], reminder: null
     },
     {
-      id: 'r15', module: 'growth', title: '4岁加强疫苗预约', date: '2026-08-20', status: 'todo',
-      tags: ['健康', '提醒'], note: '社区医院已约好，记得带接种本和休息好。',
+      id: 'r15', module: 'growth', title: '4岁视力筛查预约', date: '2026-09-10', status: 'todo',
+      tags: ['健康', '提醒'], note: '幼儿园入园要求的视力检查，已在社区医院预约，避免和疫苗节点撞期。',
       cover: 'growth', fields: { type: '健康提醒', age: '4岁3个月', place: '社区医院' },
       media: [], related: [], activities: [],
-      reminder: { next: '2026-08-20', text: '明天 4岁加强疫苗（带接种本）' }
+      reminder: { next: '2026-09-10', text: '明天 4岁视力筛查（带医保卡）' }
     }
   ];
 

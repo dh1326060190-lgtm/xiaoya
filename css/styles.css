@@ -460,6 +460,15 @@ img{display:block;max-width:100%;}
 .leaf-bar{height:9px;border-radius:6px;background:var(--cream);overflow:hidden;}
 .leaf-bar i{display:block;height:100%;background:var(--leaf);border-radius:6px;transition:.3s;}
 
+/* 物品清单勾选联动 */
+.item-check .check-list{display:flex;flex-direction:column;gap:8px;}
+.check-row{display:flex;align-items:center;gap:10px;width:100%;background:var(--card);border:1px solid rgba(58,46,34,.12);border-radius:var(--r-s);padding:10px 12px;text-align:left;transition:.15s;}
+.check-row:active{transform:scale(.99);}
+.ck{width:22px;height:22px;border-radius:6px;border:2px solid var(--apricot);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;flex:0 0 auto;}
+.ck.on{background:var(--apricot);}
+.ck-tx{font-size:14px;color:var(--ink);}
+.ck-tx.done{color:var(--ink-s);text-decoration:line-through;}
+
 /* 打卡热力图 */
 .heat-sec{margin:14px 0 4px;}
 .heat-scroll{display:flex;gap:4px;overflow-x:auto;padding:6px 0 4px;}
